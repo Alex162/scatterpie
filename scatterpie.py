@@ -6,37 +6,46 @@ import matplotlib.pyplot as plt
 import numba as nb #0.56.4 (optional; speeds up setup_scatterpie() just comment out nb.njit() if you don't want it)
 import time as time #only used for timing functions; simply comment out time.time calls etc.
 
-#The default colourset (facecolourlist) is the colourlist of Paul Tol's 'light' colourscheme;
-# Highly reccomend checking his website out: # https://personal.sron.nl/~pault/ and its associated python package.
-
-#IMPORTANT WARNING:
-#In order to keep matplotlib's pie drawing being minimally janky, the size of the figure
-# needs to scale with the number of bins; it does this automatically.
-# If you ask for a lot of bins, go for a lower DPI to avoid overflowing your RAM
-# and crashing your computer; the default DPI should be ok (100) for most purposes (up to 100 x 100 bins)
-
-# basic example, see main function: scatterpie()
-# import scatterpie as sp
-# x,y,tags=sp.testdata() # generate some labelled data
-# sp.scatterpie(x,y,tags) # make the scatterpie
 
 #The above versions are what I know works; other versions may work, but no promises
+
+"""
+The default colourset (facecolourlist) is the colourlist of Paul Tol's 'light' colourscheme;
+Highly reccomend checking his website out: # https://personal.sron.nl/~pault/ and its associated python package.
+
+IMPORTANT WARNING:
+In order to keep matplotlib's pie drawing being minimally janky, the size of the figure
+needs to scale with the number of bins; it does this automatically.
+If you ask for a lot of bins, go for a lower DPI to avoid overflowing your RAM
+and crashing your computer; the default DPI should be ok (100) for most purposes (up to 100 x 100 bins)
+
+basic example:
+import scatterpie as sp
+x,y,tags=sp.testdata() # generate some labelled data
+sp.scatterpie(x,y,tags) # make the scatterpie
+
+
+see main function scatterpie() for more functionality
+"""
 def testdata(tags_unique=['hello','world',],n=1000,xbounds=[-10,10],ybounds=[-5,5],p_tags=['default']):
-    # generate some data bounded by xbounds and ybounds, with each assigned a tag from tags_unique
-    # according to the probability ratios given in p_tags (default: equal probability).
-    #
-    # Inputs:
-    # tags_unique: labels for each unique 'tag' or classification for each data point.
-    # n: total number of data points to be generated.
-    # xbounds, ybounds: bounding values for x and y coordinates respectively..
-    # p_tags: relative probaility ratios for tags_unique (i.e. must be the same size!).
-    # e.g. tags_unique=[a,b,c] and p_tags=[1,2,3] means a ratio of 1:2:3 for each entry
-    # of tags_unique, so a probability of 1/6 for a, 2/6 for b, 3/6 for c. defaults to equal probability for each tag.
+    """
+    Generate some data bounded by xbounds and ybounds, with each assigned a tag from tags_unique
+    according to the probability ratios given in p_tags (default: equal probability).
     
-    # Xutput:
-    # x: generated x coordinates.
-    # y: generated y coordinates.
-    # tags: the assigned tag for each x and y coordinate.
+    Inputs:
+    tags_unique: labels for each unique 'tag' or classification for each data point.
+    n: total number of data points to be generated.
+    xbounds, ybounds: bounding values for x and y coordinates respectively..
+    p_tags: relative probaility ratios for tags_unique (i.e. must be the same size!).
+    e.g. tags_unique=[a,b,c] and p_tags=[1,2,3] means a ratio of 1:2:3 for each entry
+    of tags_unique, so a probability of 1/6 for a, 2/6 for b, 3/6 for c. defaults to equal probability for each tag.
+    
+    Output:
+    x: generated x coordinates.
+    y: generated y coordinates.
+    tags: the assigned tag for each x and y coordinate.
+
+    """
     x=np.random.uniform(low=np.min(xbounds),high=np.max(xbounds),size=n)
     y=np.random.uniform(low=np.min(ybounds),high=np.max(ybounds),size=n)
     
@@ -56,19 +65,20 @@ def testdata(tags_unique=['hello','world',],n=1000,xbounds=[-10,10],ybounds=[-5,
 
 nb.njit()
 def setup_scatterpie(x,y,tags,weights='default',binx=10,biny=10):
-    # returns the pie centroids, ratios, and binning properties given x and y coordinates along with a list of tags for each coordinate.
-    #
-    # Inputs:
-    # x,y: lists of the x and y coordinates of the data, respectively.
-    # tags: list of tags (list of strings) associated with each data point.
-    # weights: relative weight of each data point. Defaults to all points being weighted equally.
-    # binx, biny: number of x and y bins, respectively. (total number of bins is binx * biny)
+    """
+    Returns the pie centroids, ratios, and binning properties given x and y coordinates along with a list of tags for each coordinate.
     
-    # Outputs:
-    # ratios: list of arrays with the ratio (for each tag) relevant for each pie chart to be plotted.
-    # centerx, centery: the coordinates of the centers of each pie chart to be plotted.
-    # binedgesx, bindedgesy: the bounds of each bin that were used to generate the ratios for each pie chart to be plotted.
-
+    Inputs:
+    x,y: lists of the x and y coordinates of the data, respectively.
+    tags: list of tags (list of strings) associated with each data point.
+    weights: relative weight of each data point. Defaults to all points being weighted equally.
+    binx, biny: number of x and y bins, respectively. (total number of bins is binx * biny)
+    
+    Outputs:
+    ratios: list of arrays with the ratio (for each tag) relevant for each pie chart to be plotted.
+    centerx, centery: the coordinates of the centers of each pie chart to be plotted.
+    binedgesx, bindedgesy: the bounds of each bin that were used to generate the ratios for each pie chart to be plotted.
+"""
     x=np.array(x)
     y=np.array(y)
     tags=np.array(tags)
@@ -140,16 +150,17 @@ def mscatter(x,y,ax=None, m=None, **kw):
 
 def draw_pie(dist,xpos,ypos,size,ax=None,
     facecolorlist=['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000']):
-    # code for the drawing of the pie charts, based on code originally written by Quang Hoang, see:
-    # https://stackoverflow.com/questions/56337732/how-to-plot-scatter-pie-chart-using-matplotlib
+    """
+    Code for the drawing of the pie charts, based on code originally written by Quang Hoang, see:
+    https://stackoverflow.com/questions/56337732/how-to-plot-scatter-pie-chart-using-matplotlib
     
-    # Input:
-    # dist: ratio distributions (list of ratio arrays),
-    # xpos, ypos: coordinates of the pie chart centers
-    # size: size of the pie chart
-    # ax: esitisting axis object you want to use.
-    # facecolorlist: colors you want to use for each tag.
-
+    Input:
+    dist: ratio distributions (list of ratio arrays),
+    xpos, ypos: coordinates of the pie chart centers
+    size: size of the pie chart
+    ax: esitisting axis object you want to use.
+    facecolorlist: colors you want to use for each tag.
+    """
     
     if ax is None:
         print('no axis passed')
@@ -183,33 +194,33 @@ def draw_pie(dist,xpos,ypos,size,ax=None,
 def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',tags_unique_labels='default',
     binx=10,biny=10,dpi=100,piesize=2880,fontsize=24,ticksize=26,make_legend=True,xlabel='',ylabel='', close_all=True,
     facecolorlist= ['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000']):
-    
-    # Main function for making a scatterpie, a way of visuallising qualitativly distinct data in 2-D, fast.
-    # note: these figures tend to be quite large. This is so the piecharts don't become deformed and nasty.
-    # If the size of the figure becomes a problem, I recomend lowering the DPI before hacking into other aspects of the code.
+    """
+    Main function for making a scatterpie, a way of visuallising qualitativly distinct data in 2-D, fast.
+    note: these figures tend to be quite large. This is so the piecharts don't become deformed and nasty.
+    If the size of the figure becomes a problem, I recomend lowering the DPI before hacking into other aspects of the code.
 
-    #inputs:
-    # x, y: lists of  x and y data coordinates of the data.
-    # tags: list of strings identifying each data coordinate. e.g. ['dog', 'duck', 'goose', 'duck', 'duck', ...]
-    # weights: weights of each data coordinate. defaults to equal weighting.
-    # savepath: path to the directory the resulting image will be saved.
-    # savename: name of the saved image, including extension.
-    # tags_unique: a list of all unique tags. only really useful if you want to use different
-    #             tag labels (see tags_unique_labels) than the strings of the tags themselves.
-    # tags_unique_labels: labels for the tags. If you set this, you MUST also manually set tags_unique to make sure they line up!
-    # binx, biny: number of x and y bins, respectively. (total number of bins is binx * biny)
-    # dpi: resolution. lower to reduce figure size but reduce figure quality.
-    # facecolorlist: list of colors used for each differnent. Must have AT LEAST as entries colors as unqiue tags there are.
-    # piesize: sets the size of each pie chart
-    # fontsize: scales the font size for basically everything (different elements are set based on fixed offsets of this number.)
-    # ticksize: sets the size of the ax ticks.
-    # make_legend: boolean, True makes a legend for the tags, False turns the legend off.
-    # xlabel, ylabel: x and y labels.
-    # close_all: boolean, True closes the figure after its done (making the return worthless) while False does not.
+    Inputs:
+    x, y: lists of  x and y data coordinates of the data.
+    tags: list of strings identifying each data coordinate. e.g. ['dog', 'duck', 'goose', 'duck', 'duck', ...]
+    weights: weights of each data coordinate. defaults to equal weighting.
+    savepath: path to the directory the resulting image will be saved.
+    savename: name of the saved image, including extension.
+    tags_unique: a list of all unique tags. only really useful if you want to use different
+                tag labels (see tags_unique_labels) than the strings of the tags themselves.
+    tags_unique_labels: labels for the tags. If you set this, you MUST also manually set tags_unique to make sure they line up!
+    binx, biny: number of x and y bins, respectively. (total number of bins is binx * biny)
+    dpi: resolution. lower to reduce figure size but reduce figure quality.
+    facecolorlist: list of colors used for each differnent. Must have AT LEAST as entries colors as unqiue tags there are.
+    piesize: sets the size of each pie chart
+    fontsize: scales the font size for basically everything (different elements are set based on fixed offsets of this number.)
+    ticksize: sets the size of the ax ticks.
+    make_legend: boolean, True makes a legend for the tags, False turns the legend off.
+    xlabel, ylabel: x and y labels.
+    close_all: boolean, True closes the figure after its done (making the return worthless) while False does not.
 
-    #Outputs:
-    #fig,ax: figure and axis objects of the plot.
-
+    Outputs:
+    fig,ax: figure and axis objects of the plot.
+    """
     tinit=time.time()
 
     x=np.array(x)
