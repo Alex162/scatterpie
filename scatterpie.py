@@ -88,6 +88,28 @@ def setup_scatterpie(x,y,tags,weights='default',binx=10,biny=10):
     maxx=np.max(x)
     miny=np.min(y)
     maxy=np.max(y)
+
+    #'fix' for if you feed it data that is all at the same point in one or both axes.
+    #it being a shit number is necessary to avoid a bin edge falling right on your data!
+    if minx==maxx:
+        minx+=-0.099236423413
+        maxx+=0.099236423413
+
+    if miny==maxy:
+        miny+=-0.099236423413
+        maxy+=0.099236423413
+
+
+    if minx==maxx:
+        minx+=-0.1
+        maxx+=0.1
+
+    if miny==maxy:
+        miny+=-0.1
+        maxy+=0.1
+
+    
+        
     rangex=maxx-minx
     rangey=maxy-miny
     binwidthx=rangex/binx
@@ -101,21 +123,39 @@ def setup_scatterpie(x,y,tags,weights='default',binx=10,biny=10):
 
     binedgesx=np.arange(minx,maxx+binwidthx,rangex/binx)
     binedgesy=np.arange(miny,maxy+binwidthy,rangey/biny)
-
     centerx=[]
     centery=[]
     ratios=[]
     for i in np.arange(len(binedgesx)-1):
         for j in np.arange(len(binedgesy)-1):
             left=binedgesx[i]
-            right=binedgesx[i+1]
+            right=binedgesx[i+1] 
             bottom=binedgesy[j]
             top=binedgesy[j+1]
 
+            # the annoying precision modifications terms are due to machine precision issues
+            # that can have an annoying effect when using grid-based x and y data that affect the edges.
+            # There is almost certainly a better way to do this.
+            if i==0:
+                left-=(1e-6*left)
+                # print('left edge!' + str(left))
+
+            if j==0:
+                bottom-=(1e-6*bottom)
+                # print('bottom edge!' + str(bottom))
+
+
+            if i+1==len(binedgesx)-1:
+                right+=(1e-6*right)
+                # print('right edge!' + str(right))
+
+            if j+1==len(binedgesy)-1:
+                top+=(1e-6*top)
+                # print('top edge: ' + str(top))
             centerx.append((left+right)/2)
             centery.append((bottom+top)/2)
             
-            bin_selector=((x>left) & (x<right) & (y>bottom) & (y<top))
+            bin_selector=((x>left) & (x<=right) & (y>bottom) & (y<=top))
 
             tagsbin=tags[bin_selector]
             weightsbin=weights[bin_selector]
@@ -158,7 +198,7 @@ def draw_pie(dist,xpos,ypos,size,ax=None,
     dist: ratio distributions (list of ratio arrays),
     xpos, ypos: coordinates of the pie chart centers
     size: size of the pie chart
-    ax: esitisting axis object you want to use.
+    ax: existing axis object you want to use.
     facecolorlist: colors you want to use for each tag.
     """
     
@@ -189,9 +229,9 @@ def draw_pie(dist,xpos,ypos,size,ax=None,
                 colorlist.append(facecolorlist[j])
             j+=1
     
-    mscatter(xposlist, yposlist, m=xy, s=size,c=colorlist,rasterized=True)
+    mscatter(xposlist, yposlist, m=xy, s=size,c=colorlist,ax=ax,rasterized=True)
 
-def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',tags_unique_labels='default',
+def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savefig=True,tags_unique_labels='default',
     binx=10,biny=10,dpi=100,piesize=2880,fontsize=24,ticksize=26,make_legend=True,xlabel='',ylabel='', close_all=True,
     facecolorlist= ['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000']):
     """
@@ -258,10 +298,12 @@ def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',tags_
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    plt.tight_layout(pad=1.2)
-    print('serving pies to:')
-    print(savepath+savename)
-    plt.savefig(savepath+savename)
+
+    if savefig==True:
+        plt.tight_layout(pad=1.2)
+        print('serving pies to:')
+        print(savepath+savename)
+        plt.savefig(savepath+savename)
 
     print(time.time()-tinit)
     if close_all:
