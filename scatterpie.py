@@ -310,3 +310,123 @@ def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savef
         plt.close('all')
     return fig,ax
 
+def fancy_scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savefig=True,tags_unique_labels='default',
+    binx=10,biny=10,dpi=100,piesize=2880,fontsize=24,ticksize=26,make_legend=True,xlabel='',ylabel='', close_all=True,
+    facecolorlist= ['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000']):
+    """
+    Main function for making a scatterpie, a way of visuallising qualitativly distinct data in 2-D, fast.
+    note: these figures tend to be quite large. This is so the piecharts don't become deformed and nasty.
+    If the size of the figure becomes a problem, I recomend lowering the DPI before hacking into other aspects of the code.
+
+    Inputs:
+    x, y: lists of  x and y data coordinates of the data.
+    tags: list of strings identifying each data coordinate. e.g. ['dog', 'duck', 'goose', 'duck', 'duck', ...]
+    weights: weights of each data coordinate. defaults to equal weighting.
+    savepath: path to the directory the resulting image will be saved.
+    savename: name of the saved image, including extension.
+    tags_unique: a list of all unique tags. only really useful if you want to use different
+                tag labels (see tags_unique_labels) than the strings of the tags themselves.
+    tags_unique_labels: labels for the tags. If you set this, you MUST also manually set tags_unique to make sure they line up!
+    binx, biny: number of x and y bins, respectively. (total number of bins is binx * biny)
+    dpi: resolution. lower to reduce figure size but reduce figure quality.
+    facecolorlist: list of colors used for each differnent. Must have AT LEAST as entries colors as unqiue tags there are.
+    piesize: sets the size of each pie chart
+    fontsize: scales the font size for basically everything (different elements are set based on fixed offsets of this number.)
+    ticksize: sets the size of the ax ticks.
+    make_legend: boolean, True makes a legend for the tags, False turns the legend off.
+    xlabel, ylabel: x and y labels.
+    close_all: boolean, True closes the figure after its done (making the return worthless) while False does not.
+
+    Outputs:
+    fig,ax: figure and axis objects of the plot.
+    """
+    tinit=time.time()
+
+    x=np.array(x)
+    y=np.array(y)
+    tags=np.array(tags)
+
+    tags_unique=np.unique(tags)
+
+    if tags_unique_labels=='default':
+        tags_unique_labels=tags_unique
+
+    print('setting up')
+    ratios,centerx,centery,binedgesx,binedgesy=\
+    setup_scatterpie(x,y,tags,weights=weights,binx=binx,biny=biny)
+
+
+    #setup for the stacked claw hists
+    hist_arr_x=[]
+    hist_arr_y=[]
+    hist_arr_weights=[]
+
+    for i,tag in enumerate(tags_unique):
+        if weights=='default':
+            weights=np.ones(len(x))
+        temp_bool=tags==tag
+        hist_arr_x.append(x[temp_bool])
+        hist_arr_y.append(y[temp_bool])
+        hist_arr_weights.append(weights[temp_bool])
+
+    ax_bounds_x=[np.min(x)-0.05*np.max(x),np.max(x)+0.05*np.max(x)]
+    ax_bounds_y=[np.min(y)-0.05*np.max(y),np.max(y)+0.05*np.max(y)]
+    print('done setting up')
+    print(time.time()-tinit)
+    print(fontsize)
+
+    matplotlib.rcParams.update({'font.size':fontsize})
+    matplotlib.rc('xtick', labelsize=fontsize-4) 
+    matplotlib.rc('ytick', labelsize=fontsize-4)
+
+
+
+
+    fig=plt.figure(num=None,figsize=(20,20),dpi=dpi,facecolor='w',edgecolor='k')
+    widths=[3,1]
+    heights=[1,3]
+    spec=fig.add_gridspec(ncols=2,nrows=2,width_ratios=widths,height_ratios=heights)
+    # ax=plt.subplot(223)
+    ax=fig.add_subplot(spec[1,0])
+
+    ax.tick_params('both',which='both',direction='in',length=fontsize*0.5,width=fontsize*0.05)
+
+    draw_pie(ratios,centerx,centery,size=piesize,ax=ax,facecolorlist=facecolorlist)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_xlim(ax_bounds_x)
+    ax.set_ylim(ax_bounds_y)
+    
+    if make_legend==True:
+        ax=fig.add_subplot(spec[0,1])
+        ax.set_axis_off()
+        patchlist=[]
+        for i,label in enumerate(tags_unique):
+            patchlist.append(mpatches.Patch(color=facecolorlist[i], label=label))
+
+        plt.legend(handles=patchlist,fontsize=fontsize+4,ncols=2,loc='upper center',bbox_to_anchor=(0.5,0.95))
+
+    
+
+
+    
+    ax=fig.add_subplot(spec[0,0])
+    ax.hist(hist_arr_x,weights=hist_arr_weights,bins=binx,
+        color=facecolorlist[:len(tags_unique)],stacked=True,linewidth=1,edgecolor='k',rasterized=True)
+    ax.set_xlim(ax_bounds_x)
+
+    ax=fig.add_subplot(spec[1,1])
+    ax.hist(hist_arr_y,weights=hist_arr_weights,bins=biny,orientation='horizontal',
+        color=facecolorlist[:len(tags_unique)],stacked=True,linewidth=1,edgecolor='k',rasterized=True)
+    ax.set_ylim(ax_bounds_y)
+
+    if savefig==True:
+        plt.tight_layout(pad=1.2)
+        print('serving pies to:')
+        print(savepath+savename)
+        plt.savefig(savepath+savename)
+
+    print(time.time()-tinit)
+    if close_all:
+        plt.close('all')
+    return fig,ax
