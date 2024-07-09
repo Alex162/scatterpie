@@ -300,10 +300,9 @@ def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savef
     ax.set_ylabel(ylabel)
 
     if savefig==True:
-        plt.tight_layout(pad=1.2)
         print('serving pies to:')
         print(savepath+savename)
-        plt.savefig(savepath+savename)
+        plt.savefig(savepath+savename,bbox_inches='tight')
 
     print(time.time()-tinit)
     if close_all:
@@ -421,10 +420,9 @@ def fancy_scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf'
     ax.set_ylim(ax_bounds_y)
 
     if savefig==True:
-        plt.tight_layout(pad=1.2)
         print('serving pies to:')
         print(savepath+savename)
-        plt.savefig(savepath+savename)
+        plt.savefig(savepath+savename,bbox_inches='tight')
 
     print(time.time()-tinit)
     if close_all:
