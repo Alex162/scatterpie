@@ -2,10 +2,12 @@ import numpy as np # 1.22.3
 import matplotlib #3.7.1
 import matplotlib.patches as mpatches
 import matplotlib.markers as mmarkers
+from matplotlib.lines import Line2D
 import matplotlib.pyplot as plt
 import numba as nb #0.56.4 (optional; speeds up setup_scatterpie() just comment out nb.njit() if you don't want it)
 import time as time #only used for timing functions; simply comment out time.time calls etc.
-
+from scipy.stats import ks_2samp
+import copy
 
 #The above versions are what I know works; other versions may work, but no promises
 
@@ -64,7 +66,7 @@ def testdata(tags_unique=['hello','world',],n=1000,xbounds=[-10,10],ybounds=[-5,
 
 
 nb.njit()
-def setup_scatterpie(x,y,tags,weights='default',binx=10,biny=10):
+def setup_scatterpie(x,y,tags,tags_unique,weights='default',binx=10,biny=10):
     """
     Returns the pie centroids, ratios, and binning properties given x and y coordinates along with a list of tags for each coordinate.
     
@@ -117,9 +119,6 @@ def setup_scatterpie(x,y,tags,weights='default',binx=10,biny=10):
 
     if weights=='default':
         weights=np.ones(len(tags))
-
-    tags_unique=np.unique(tags)
-
 
     binedgesx=np.arange(minx,maxx+binwidthx,rangex/binx)
     binedgesy=np.arange(miny,maxy+binwidthy,rangey/biny)
@@ -189,7 +188,8 @@ def mscatter(x,y,ax=None, m=None, **kw):
 
 
 def draw_pie(dist,xpos,ypos,size,ax=None,
-    facecolorlist=['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000']):
+    facecolorlist=['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000'],
+    alphalist=[1,1,1,1,1,1,1,1,1,1]):
     """
     Code for the drawing of the pie charts, based on code originally written by Quang Hoang, see:
     https://stackoverflow.com/questions/56337732/how-to-plot-scatter-pie-chart-using-matplotlib
@@ -211,6 +211,7 @@ def draw_pie(dist,xpos,ypos,size,ax=None,
     xposlist=[]
     yposlist=[]
     colorlist=[]
+    alist=[]
     for i,disttemp in enumerate(dist):
         cumsum = np.cumsum(disttemp)
         cumsum = cumsum/ cumsum[-1]
@@ -227,13 +228,14 @@ def draw_pie(dist,xpos,ypos,size,ax=None,
                 xposlist.append(xpos[i])
                 yposlist.append(ypos[i])
                 colorlist.append(facecolorlist[j])
+                alist.append(alphalist[j])
             j+=1
     
-    mscatter(xposlist, yposlist, m=xy, s=size,c=colorlist,ax=ax,rasterized=True)
+    mscatter(xposlist, yposlist, m=xy, s=size,c=colorlist,alpha=alist,ax=ax,rasterized=True)
 
-def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savefig=True,tags_unique_labels='default',
-    binx=10,biny=10,dpi=100,piesize=2880,fontsize=24,ticksize=26,make_legend=True,xlabel='',ylabel='', close_all=True,
-    facecolorlist= ['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000']):
+def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savefig=True,tags_unique='default',
+    tags_unique_labels='default',binx=10,biny=10,dpi=100,piesize=2880,fontsize=24,ticksize=26,make_legend=True,xlabel='',ylabel='',
+     close=True,facecolorlist= ['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000']):
     """
     Main function for making a scatterpie, a way of visuallising qualitativly distinct data in 2-D, fast.
     note: these figures tend to be quite large. This is so the piecharts don't become deformed and nasty.
@@ -266,15 +268,15 @@ def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savef
     x=np.array(x)
     y=np.array(y)
     tags=np.array(tags)
-
-    tags_unique=np.unique(tags)
+    if tags_unique=='default':
+        tags_unique=np.unique(tags)
 
     if tags_unique_labels=='default':
         tags_unique_labels=tags_unique
 
     print('setting up')
     ratios,centerx,centery,binedgesx,binedgesy=\
-    setup_scatterpie(x,y,tags,weights=weights,binx=binx,biny=biny)
+    setup_scatterpie(x,y,tags,tags_unique=tags_unique,weights=weights,binx=binx,biny=biny)
 
     print('done setting up')
     print(time.time()-tinit)
@@ -291,7 +293,7 @@ def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savef
     
     if make_legend==True:
         patchlist=[]
-        for i,label in enumerate(tags_unique):
+        for i,label in enumerate(tags_unique_labels):
             patchlist.append(mpatches.Patch(color=facecolorlist[i], label=label))
 
         plt.legend(handles=patchlist,fontsize=fontsize+4,ncols=3,loc='lower center',bbox_to_anchor=(0.5,1.05))
@@ -305,13 +307,231 @@ def scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savef
         plt.savefig(savepath+savename,bbox_inches='tight')
 
     print(time.time()-tinit)
-    if close_all:
-        plt.close('all')
+    if close:
+        plt.close()
     return fig,ax
 
-def fancy_scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf',savefig=True,tags_unique_labels='default',
-    binx=10,biny=10,dpi=100,piesize=2880,fontsize=24,ticksize=26,make_legend=True,xlabel='',ylabel='', close_all=True,
-    facecolorlist= ['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000']):
+# def fancy_scatterpie(x,y,tags,scattermode=False,scattersize=50,weights='default',savepath='',savename='dummy.pdf',savefig=True,
+#     tags_unique='default',tags_unique_labels='default',binx=10,biny=10,dpi=100,piesize=2880,fontsize=24,ticksize=26,
+#     make_legend=True,xlabel='',ylabel='', close=True, invx=False,invy=False,
+#     facecolorlist= ['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000'],
+#     alphalist=[1,1,1,1,1,1,1,1,1,1],legend_cols=2,kstable=False,xyline=False,table_alpha=0.5):
+#     """
+#     Main function for making a scatterpie, a way of visuallising qualitativly distinct data in 2-D, fast.
+#     note: these figures tend to be quite large. This is so the piecharts don't become deformed and nasty.
+#     If the size of the figure becomes a problem, I recomend lowering the DPI before hacking into other aspects of the code.
+
+#     Inputs:
+#     x, y: lists of  x and y data coordinates of the data.
+#     tags: list of strings identifying each data coordinate. e.g. ['dog', 'duck', 'goose', 'duck', 'duck', ...]
+#     weights: weights of each data coordinate. defaults to equal weighting.
+#     savepath: path to the directory the resulting image will be saved.
+#     savename: name of the saved image, including extension.
+#     tags_unique: a list of all unique tags. only really useful if you want to use different
+#                 tag labels (see tags_unique_labels) than the strings of the tags themselves.
+#     tags_unique_labels: labels for the tags. If you set this, you MUST also manually set tags_unique to make sure they line up!
+#     binx, biny: number of x and y bins, respectively. (total number of bins is binx * biny)
+#     dpi: resolution. lower to reduce figure size but reduce figure quality.
+#     facecolorlist: list of colors used for each differnent. Must have AT LEAST as entries colors as unqiue tags there are.
+#     piesize: sets the size of each pie chart
+#     fontsize: scales the font size for basically everything (different elements are set based on fixed offsets of this number.)
+#     ticksize: sets the size of the ax ticks.
+#     make_legend: boolean, True makes a legend for the tags, False turns the legend off.
+#     xlabel, ylabel: x and y labels.
+#     close_all: boolean, True closes the figure after its done (making the return worthless) while False does not.
+
+#     Outputs:
+#     fig,ax: figure and axis objects of the plot.
+#     """
+#     tinit=time.time()
+#     # print("Hi!")
+#     x=np.array(x)
+#     y=np.array(y)
+#     tags=np.array(tags)
+
+#     if tags_unique=='default':
+#         tags_unique=np.unique(tags)
+#     if tags_unique_labels=='default':
+#         tags_unique_labels=tags_unique
+
+#     if not scattermode:
+#         print('setting up')
+#         ratios,centerx,centery,binedgesx,binedgesy=\
+#         setup_scatterpie(x,y,tags,tags_unique=tags_unique,weights=weights,binx=binx,biny=biny)
+
+
+#     #setup for the stacked claw hists
+#     hist_arr_x=[]
+#     hist_arr_y=[]
+#     hist_arr_weights=[]
+
+#     for i,tag in enumerate(tags_unique):
+#         if weights=='default':
+#             weights=np.ones(len(x))
+#         temp_bool=tags==tag
+#         hist_arr_x.append(x[temp_bool])
+#         hist_arr_y.append(y[temp_bool])
+#         hist_arr_weights.append(weights[temp_bool])
+
+#     ax_bounds_x=[np.min(x)-0.05*np.max(x),np.max(x)+0.05*np.max(x)]
+#     ax_bounds_y=[np.min(y)-0.05*np.max(y),np.max(y)+0.05*np.max(y)]
+#     print('done setting up')
+#     print(time.time()-tinit)
+#     print(fontsize)
+
+#     matplotlib.rcParams.update({'font.size':fontsize})
+#     matplotlib.rc('xtick', labelsize=fontsize-4) 
+#     matplotlib.rc('ytick', labelsize=fontsize-4)
+
+
+
+
+#     fig=plt.figure(num=None,figsize=(20,20),dpi=dpi,facecolor='w',edgecolor='k')
+#     widths=[3,1]
+#     heights=[1,3]
+#     spec=fig.add_gridspec(ncols=2,nrows=2,width_ratios=widths,height_ratios=heights)
+#     # ax=plt.subplot(223)
+#     ax1=fig.add_subplot(spec[1,0])
+
+#     ax1.tick_params('both',which='both',direction='in',length=fontsize*0.5,width=fontsize*0.05)
+#     if not scattermode:
+#         draw_pie(ratios,centerx,centery,size=piesize,ax=ax1,facecolorlist=facecolorlist,alphalist=alphalist)
+#     else: 
+#         for i,tag in enumerate(tags_unique):
+#             tagbool=tags==tag
+#             ax1.scatter(x[tagbool],y[tagbool],s=scattersize,c=facecolorlist[i],alpha=alphalist[i],edgecolor='none')
+#     ax1.set_xlabel(xlabel,fontsize=fontsize)
+#     ax1.set_ylabel(ylabel,fontsize=fontsize)
+#     ax1.set_xlim(ax_bounds_x)
+#     ax1.set_ylim(ax_bounds_y)
+#     if xyline:
+#         ax1.plot(ax_bounds_x,ax_bounds_x,alpha=0.5,c='k',linewidth=2)
+
+#     if invx:
+#         ax1.invert_xaxis()
+#     if invy:
+#         ax1.invert_yaxis()
+    
+#     if make_legend==True:
+#         ax4=fig.add_subplot(spec[0,1])
+#         ax4.set_axis_off()
+#         patchlist=[]
+#         for i,label in enumerate(tags_unique_labels):
+#             patchlist.append(Line2D([0], [0], color=facecolorlist[i],marker='o',alpha=alphalist[i], label=label,markersize=np.sqrt(scattersize*2)))
+#         if kstable:
+#             patchlist.append(mpatches.Patch(color='lightgreen',label='Sample size',alpha=table_alpha))
+#             patchlist.append(mpatches.Patch(color='plum',label=f'ks p-val {ylabel}',alpha=table_alpha))
+#             patchlist.append(mpatches.Patch(color='moccasin',label=f'ks p-val {xlabel}',alpha=table_alpha))
+            
+#         plt.legend(handles=patchlist,fontsize=fontsize+4,ncols=legend_cols,loc='upper center',bbox_to_anchor=(0.5,0.95))
+
+#     #x projection
+#     ax2=fig.add_subplot(spec[0,0])
+#     # ax.hist(hist_arr_x,weights=hist_arr_weights,bins=binx,
+#     #     color=facecolorlist[:len(tags_unique)],stacked=True,
+#     #     linewidth=1,edgecolor='k',alpha=alphalist,rasterized=True)
+#     bottom=np.zeros(binx)
+#     binedges=np.linspace(np.min(x),np.max(x),binx+1)
+#     for d, c, a in zip(hist_arr_x, facecolorlist[:len(tags_unique)], alphalist[:len(tags_unique)]):
+#         counts, _ = np.histogram(d, bins=binedges)
+#         ax2.bar(binedges[:-1], counts, width=np.diff(binedges), bottom=bottom, 
+#                 align='edge', color=c, alpha=a,
+#                 edgecolor='k',linewidth=1)
+#         bottom += counts
+#     ax2.set_xlim(ax_bounds_x)
+#     if invx:
+#         ax2.invert_xaxis()
+
+#     # rows=tags_unique
+#     # columns=tags_unique
+#     # color_arr=np.empty([len(hist_arr_x),len(hist_arr_x)],dtype="<U100")
+#     # for i,_ in enumerate(hist_arr_x):
+#     #     for j,_ in enumerate(hist_arr_x):
+#     #         if i==j:
+#     #             color_arr[i,j]='lightgreen'
+#     #         if i<j:
+#     #             color_arr[i,j]='moccasin'
+#     #         if j<i:
+#     #             color_arr[i,j]='plum'
+
+
+#     # table=plt.table(cellText=combine,rowLabels=rows,colLabels=columns,loc='upper right',
+#     #     colWidths=[0.1]*len(hist_arr_x),edges='closed',cellColours=color_arr,fontsize=100)
+#     # for c in table.get_children():
+#     #     c.set_edgecolor('none')
+#     # table.scale(1,1)
+
+
+#     #y projection
+#     ax3=fig.add_subplot(spec[1,1])
+#     # ax.hist(hist_arr_y,weights=hist_arr_weights,bins=biny,orientation='horizontal',
+#     #     color=facecolorlist[:len(tags_unique)],stacked=True,linewidth=1,edgecolor='k',rasterized=True)
+#     left=np.zeros(biny)
+#     binedges=np.linspace(np.min(y),np.max(y),biny+1)
+#     for d, c, a in zip(hist_arr_y, facecolorlist[:len(tags_unique)], alphalist[:len(tags_unique)]):
+#         counts, _ = np.histogram(d, bins=binedges)
+#         ax3.barh(binedges[:-1], counts, height=np.diff(binedges), left=left, 
+#                 align='edge', color=c, alpha=a,
+#                 edgecolor='k',linewidth=1)
+
+#         left += counts
+
+
+#     ax3.set_ylim(ax_bounds_y)
+    
+#     if kstable:
+        
+#         _,_,combine_x=kstest(hist_arr_x)
+#         _,_,combine_y=kstest(hist_arr_y)
+#         rows=tags_unique
+#         columns=tags_unique
+
+
+#         combine=copy.copy(combine_y)
+#         color_arr=np.empty([len(hist_arr_y),len(hist_arr_y)],dtype="<U100")
+#         for i,_ in enumerate(hist_arr_y):
+#             for j,_ in enumerate(hist_arr_y):
+#                 if i==j:
+#                     color_arr[i,j]='lightgreen'
+#                 if i<j:
+#                     color_arr[i,j]='plum'
+#                     combine[i,j]=combine_y[i,j]
+#                 if j<i:
+#                     color_arr[i,j]='moccasin'
+#                     combine[i,j]=combine_x[i,j]
+
+
+#         table=ax1.table(cellText=combine,rowLabels=rows,colLabels=columns,loc='upper right',
+#             colWidths=[0.15]*len(hist_arr_y),edges='closed',cellColours=color_arr)
+#         for c in table.get_children():
+#             c.set_edgecolor('none')
+#         table.scale(1,1.5)
+#         table.set_zorder(1)
+#         table.set_fontsize(12)
+        
+#         for cell in table._cells:
+#             table._cells[cell].set_alpha(table_alpha)
+#     if invy:
+#         ax3.invert_yaxis()
+
+#     if savefig==True:
+#         print('serving pies to:')
+#         print(savepath+savename)
+#         plt.savefig(savepath+savename,bbox_inches='tight')
+
+#     print(time.time()-tinit)
+#     if close:
+#         plt.close()
+#     return fig,ax1,ax2,ax3
+
+
+
+
+def fancy_scatterpie(x,y,tags,scattermode=False,step=True,scattersize=50,weights='default',savepath='',savename='dummy.pdf',savefig=True,
+    tags_unique='default',tags_unique_labels='default',binx=10,biny=10,dpi=100,piesize=2880,fontsize=24,ticksize=26,
+    make_legend=True,xlabel='',ylabel='', close=True, invx=False,invy=False,ax_bounds_x=[0,0],ax_bounds_y=[0,0],
+    facecolorlist= ['#77AADD', '#EE8866', '#EEDD88','#FFAABB', '#99DDFF','#44BB99', '#BBCC33', '#AAAA00', '#DDDDDD', '#000000'],
+    alphalist=[1,1,1,1,1,1,1,1,1,1],legend_cols=2,kstable=False,xyline=False,table_alpha=0.5):
     """
     Main function for making a scatterpie, a way of visuallising qualitativly distinct data in 2-D, fast.
     note: these figures tend to be quite large. This is so the piecharts don't become deformed and nasty.
@@ -340,19 +560,20 @@ def fancy_scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf'
     fig,ax: figure and axis objects of the plot.
     """
     tinit=time.time()
-
+    # print("Hi!")
     x=np.array(x)
     y=np.array(y)
     tags=np.array(tags)
 
-    tags_unique=np.unique(tags)
-
+    if tags_unique=='default':
+        tags_unique=np.unique(tags)
     if tags_unique_labels=='default':
         tags_unique_labels=tags_unique
 
-    print('setting up')
-    ratios,centerx,centery,binedgesx,binedgesy=\
-    setup_scatterpie(x,y,tags,weights=weights,binx=binx,biny=biny)
+    if not scattermode:
+        print('setting up')
+        ratios,centerx,centery,binedgesx,binedgesy=\
+        setup_scatterpie(x,y,tags,tags_unique=tags_unique,weights=weights,binx=binx,biny=biny)
 
 
     #setup for the stacked claw hists
@@ -368,8 +589,13 @@ def fancy_scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf'
         hist_arr_y.append(y[temp_bool])
         hist_arr_weights.append(weights[temp_bool])
 
-    ax_bounds_x=[np.min(x)-0.05*np.max(x),np.max(x)+0.05*np.max(x)]
-    ax_bounds_y=[np.min(y)-0.05*np.max(y),np.max(y)+0.05*np.max(y)]
+    if ax_bounds_x==[0,0]:
+        ax_bounds_x=[np.min(x)-0.05*np.max(x),np.max(x)+0.05*np.max(x)]
+    if ax_bounds_y==[0,0]:
+        ax_bounds_y=[np.min(y)-0.05*np.max(y),np.max(y)+0.05*np.max(y)]
+    
+
+
     print('done setting up')
     print(time.time()-tinit)
     print(fontsize)
@@ -386,38 +612,136 @@ def fancy_scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf'
     heights=[1,3]
     spec=fig.add_gridspec(ncols=2,nrows=2,width_ratios=widths,height_ratios=heights)
     # ax=plt.subplot(223)
-    ax=fig.add_subplot(spec[1,0])
+    ax1=fig.add_subplot(spec[1,0])
 
-    ax.tick_params('both',which='both',direction='in',length=fontsize*0.5,width=fontsize*0.05)
+    ax1.tick_params('both',which='both',direction='in',length=fontsize*0.5,width=fontsize*0.05)
+    if not scattermode:
+        draw_pie(ratios,centerx,centery,size=piesize,ax=ax1,facecolorlist=facecolorlist,alphalist=alphalist)
+    else: 
+        for i,tag in enumerate(tags_unique):
+            tagbool=tags==tag
+            ax1.scatter(x[tagbool],y[tagbool],s=scattersize,c=facecolorlist[i],alpha=alphalist[i],edgecolor='none')
+    ax1.set_xlabel(xlabel,fontsize=fontsize)
+    ax1.set_ylabel(ylabel,fontsize=fontsize)
+    ax1.set_xlim(ax_bounds_x)
+    ax1.set_ylim(ax_bounds_y)
+    if xyline:
+        ax1.plot(ax_bounds_x,ax_bounds_x,alpha=0.5,c='k',linewidth=2)
 
-    draw_pie(ratios,centerx,centery,size=piesize,ax=ax,facecolorlist=facecolorlist)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_xlim(ax_bounds_x)
-    ax.set_ylim(ax_bounds_y)
+    if invx:
+        ax1.invert_xaxis()
+    if invy:
+        ax1.invert_yaxis()
     
     if make_legend==True:
-        ax=fig.add_subplot(spec[0,1])
-        ax.set_axis_off()
+        ax4=fig.add_subplot(spec[0,1])
+        ax4.set_axis_off()
         patchlist=[]
-        for i,label in enumerate(tags_unique):
-            patchlist.append(mpatches.Patch(color=facecolorlist[i], label=label))
+        for i,label in enumerate(tags_unique_labels):
+            patchlist.append(Line2D([0], [0], color=facecolorlist[i],marker='o',alpha=alphalist[i], label=label,markersize=np.sqrt(scattersize*2)))
+        if kstable:
+            patchlist.append(mpatches.Patch(color='lightgreen',label='Sample size',alpha=table_alpha))
+            patchlist.append(mpatches.Patch(color='plum',label=f'ks p-val {ylabel}',alpha=table_alpha))
+            patchlist.append(mpatches.Patch(color='moccasin',label=f'ks p-val {xlabel}',alpha=table_alpha))
+            
+        plt.legend(handles=patchlist,fontsize=fontsize+4,ncols=legend_cols,loc='upper center',bbox_to_anchor=(0.5,0.95))
 
-        plt.legend(handles=patchlist,fontsize=fontsize+4,ncols=2,loc='upper center',bbox_to_anchor=(0.5,0.95))
-
+    #x projection
+    ax2=fig.add_subplot(spec[0,0])
+    # ax.hist(hist_arr_x,weights=hist_arr_weights,bins=binx,
+    #     color=facecolorlist[:len(tags_unique)],stacked=True,
+    #     linewidth=1,edgecolor='k',alpha=alphalist,rasterized=True)
+    binedges=np.linspace(np.min(x),np.max(x),binx+1)
+    if step:
+        ax2.hist(hist_arr_x,weights=hist_arr_weights,density=True,bins=binedges,histtype='step',
+            color=facecolorlist[:len(tags_unique)],linewidth=3,rasterized=True)
+    else:
+        bottom=np.zeros(binx)
+        for d, c, a in zip(hist_arr_x, facecolorlist[:len(tags_unique)], alphalist[:len(tags_unique)]):
+            counts, _ = np.histogram(d, bins=binedges)
+            ax2.bar(binedges[:-1], counts, width=np.diff(binedges), bottom=bottom, 
+                    align='edge', color=c, alpha=a,
+                    edgecolor='k',linewidth=1)
+            bottom += counts
     
+    ax2.set_xlim(ax_bounds_x)
+    if invx:
+        ax2.invert_xaxis()
+
+    # rows=tags_unique
+    # columns=tags_unique
+    # color_arr=np.empty([len(hist_arr_x),len(hist_arr_x)],dtype="<U100")
+    # for i,_ in enumerate(hist_arr_x):
+    #     for j,_ in enumerate(hist_arr_x):
+    #         if i==j:
+    #             color_arr[i,j]='lightgreen'
+    #         if i<j:
+    #             color_arr[i,j]='moccasin'
+    #         if j<i:
+    #             color_arr[i,j]='plum'
 
 
+    # table=plt.table(cellText=combine,rowLabels=rows,colLabels=columns,loc='upper right',
+    #     colWidths=[0.1]*len(hist_arr_x),edges='closed',cellColours=color_arr,fontsize=100)
+    # for c in table.get_children():
+    #     c.set_edgecolor('none')
+    # table.scale(1,1)
+
+
+    #y projection
+    ax3=fig.add_subplot(spec[1,1])
+    # ax.hist(hist_arr_y,weights=hist_arr_weights,bins=biny,orientation='horizontal',
+    #     color=facecolorlist[:len(tags_unique)],stacked=True,linewidth=1,edgecolor='k',rasterized=True)
+    left=np.zeros(biny)
+    binedges=np.linspace(np.min(y),np.max(y),biny+1)
+    if step:
+        ax3.hist(hist_arr_y,weights=hist_arr_weights,density=True,bins=binedges,histtype='step',
+            color=facecolorlist[:len(tags_unique)],linewidth=3,rasterized=True,orientation='horizontal')
+    else:
+        for d, c, a in zip(hist_arr_y, facecolorlist[:len(tags_unique)], alphalist[:len(tags_unique)]):
+            counts, _ = np.histogram(d, bins=binedges)
+            ax3.barh(binedges[:-1], counts, height=np.diff(binedges), left=left, 
+                    align='edge', color=c, alpha=a,
+                    edgecolor='k',linewidth=1)
+            left += counts
+
+
+    ax3.set_ylim(ax_bounds_y)
     
-    ax=fig.add_subplot(spec[0,0])
-    ax.hist(hist_arr_x,weights=hist_arr_weights,bins=binx,
-        color=facecolorlist[:len(tags_unique)],stacked=True,linewidth=1,edgecolor='k',rasterized=True)
-    ax.set_xlim(ax_bounds_x)
+    if kstable:
+        
+        _,_,combine_x=kstest(hist_arr_x)
+        _,_,combine_y=kstest(hist_arr_y)
+        rows=tags_unique
+        columns=tags_unique
 
-    ax=fig.add_subplot(spec[1,1])
-    ax.hist(hist_arr_y,weights=hist_arr_weights,bins=biny,orientation='horizontal',
-        color=facecolorlist[:len(tags_unique)],stacked=True,linewidth=1,edgecolor='k',rasterized=True)
-    ax.set_ylim(ax_bounds_y)
+
+        combine=copy.copy(combine_y)
+        color_arr=np.empty([len(hist_arr_y),len(hist_arr_y)],dtype="<U100")
+        for i,_ in enumerate(hist_arr_y):
+            for j,_ in enumerate(hist_arr_y):
+                if i==j:
+                    color_arr[i,j]='lightgreen'
+                if i<j:
+                    color_arr[i,j]='plum'
+                    combine[i,j]=combine_y[i,j]
+                if j<i:
+                    color_arr[i,j]='moccasin'
+                    combine[i,j]=combine_x[i,j]
+
+
+        table=ax1.table(cellText=combine,rowLabels=rows,colLabels=columns,loc='upper right',
+            colWidths=[0.15]*len(hist_arr_y),edges='closed',cellColours=color_arr)
+        for c in table.get_children():
+            c.set_edgecolor('none')
+        table.scale(1,1.5)
+        table.set_zorder(1)
+        table.set_fontsize(12)
+        
+        for cell in table._cells:
+            table._cells[cell].set_alpha(table_alpha)
+    if invy:
+        ax3.invert_yaxis()
 
     if savefig==True:
         print('serving pies to:')
@@ -425,6 +749,44 @@ def fancy_scatterpie(x,y,tags,weights='default',savepath='',savename='dummy.pdf'
         plt.savefig(savepath+savename,bbox_inches='tight')
 
     print(time.time()-tinit)
-    if close_all:
-        plt.close('all')
-    return fig,ax
+    if close:
+        plt.close()
+    return fig,ax1,ax2,ax3
+
+
+
+
+def kstest(arr):
+    #arr: an array of arrays (or list of lists) that contain all the distributins to compute ks and p-values for
+    #ks: the maximum distance between the two distributions when represented as cdfs.
+    #p: the probability that the observed diference between the distributions is due to random chance assuming drawn from same underlying distribution
+    #combine_out: lower diagonal (j<i) are p_values, upper diagonal are ks values, main diagonal is the length of each array.
+    ks_out=np.zeros([len(arr),len(arr)])
+    p_out=np.zeros([len(arr),len(arr)])
+    combine_out=np.empty([len(arr),len(arr)],dtype=np.dtype('U100'))
+
+
+    for i,_ in enumerate(arr):
+        for j,_ in enumerate(arr):
+            try:
+                ks,p=ks_2samp(arr[i],arr[j])
+                ks_out[i,j]=ks
+                p_out[i,j]=p
+
+                if i<j:
+                    # print("i<j")
+                    # print(i,j)
+                    combine_out[i,j]="{:.6f}".format(p)
+                if j<i:
+                    # print("j<i")
+                    # print(i,j)
+                    combine_out[i,j]="{:.6f}".format(p)
+                if i==j:
+                    combine_out[i,j]="{:.0f}".format(len(arr[i]))
+
+            except Exception as error:
+                print(error)
+
+    # print(combine_out)
+    return ks_out,p_out,combine_out
+
